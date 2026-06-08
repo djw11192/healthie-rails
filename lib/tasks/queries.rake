@@ -20,9 +20,8 @@ namespace :queries do
     puts line
     puts "2. All providers for client ##{client.id} (#{client.name})"
     puts line
-    client.providers.each do |p|
-      plan = Enrollment.find_by(provider: p, client: client).plan
-      puts "  - #{p.name} <#{p.email}>  [plan: #{plan}]"
+    client.enrollments.includes(:provider).each do |e|
+      puts "  - #{e.provider.name} <#{e.provider.email}>  [plan: #{e.plan}]"
     end
 
     puts
@@ -37,19 +36,10 @@ namespace :queries do
     puts line
     puts "4. All journal entries across all of provider ##{provider.id}'s clients, newest first"
     puts line
-    # Clean version via the through-association:
-    #   provider.journal_entries.by_recent
-    # which Rails compiles to the explicit join below:
-    entries = JournalEntry
-                .joins(client: :enrollments)
-                .where(enrollments: { provider_id: provider.id })
-                .order(created_at: :desc)
+    entries = provider.journal_entries.by_recent.includes(:client)
     entries.each do |e|
       puts "  - #{e.created_at.to_date}  [#{e.client.name}]  #{e.body.truncate(50)}"
     end
 
-    puts
-    puts "Tip: same result as `provider.journal_entries.by_recent` " \
-         "(#{provider.journal_entries.count} entries)."
   end
 end

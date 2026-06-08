@@ -5,13 +5,26 @@ A Rails 8 API app modeling dietitian-style **providers**, their **clients**, and
 
 ## Requirements
 
-- Ruby 3.x (built against 3.4)
+- Ruby 3.4.2 (via rbenv/asdf — macOS system Ruby will not work)
 - PostgreSQL running locally
-- Bundler
+- Bundler 2.6.3
 
 ## Setup
 
+**1. Install Ruby 3.4.2** (skip if already on 3.4.2)
+
 ```bash
+# macOS via Homebrew
+brew install rbenv ruby-build
+echo 'eval "$(rbenv init -)"' >> ~/.zshrc && source ~/.zshrc
+rbenv install 3.4.2
+# .ruby-version in this repo pins the project to 3.4.2 automatically
+```
+
+**2. Install dependencies and set up the database**
+
+```bash
+gem install bundler:2.6.3
 bundle install
 bin/rails db:create db:migrate db:seed
 ```
@@ -39,10 +52,46 @@ This prints, against seeded data:
      .order(created_at: :desc)
    ```
 
+## API endpoints (try them in Postman / curl)
+
+Start the server, then hit the endpoints below. The same four queries are also exposed over HTTP
+as JSON.
+
+```bash
+bin/rails server     # http://localhost:3000
+```
+
+| Query | Method & path | Returns |
+| --- | --- | --- |
+| Discover IDs | `GET /providers`, `GET /clients` | list of providers / clients |
+| 1. Clients for a provider | `GET /providers/:id/clients` | the provider's clients, each with their `plan` |
+| 2. Providers for a client | `GET /clients/:id/providers` | the client's providers, each with their `plan` |
+| 3. A client's journal entries | `GET /clients/:id/journal_entries` | the client's entries, newest first |
+| 4. A provider's clients' entries | `GET /providers/:id/journal_entries` | entries across all the provider's clients, newest first, tagged with the client |
+| Post a journal entry | `POST /clients/:id/journal_entries` | creates an entry for the client; `201` on success, `422` with errors if `body` is blank |
+
+Notes:
+- All responses are JSON; an unknown `:id` returns a JSON `404`.
+- `plan` (basic/premium) is included where relevant because it lives on the provider↔client join.
+- IDs aren't guaranteed to start at 1 (Postgres sequences persist across re-seeds) — use the
+  `GET /providers` and `GET /clients` index routes to find real IDs.
+
+Example:
+
+```bash
+curl http://localhost:3000/providers
+curl http://localhost:3000/providers/1/journal_entries
+
+# Post a new journal entry for a client:
+curl -X POST http://localhost:3000/clients/1/journal_entries \
+  -H 'Content-Type: application/json' \
+  -d '{"journal_entry": {"body": "Felt great today."}}'
+```
+
 ## Tests
 
 ```bash
-bundle exec rspec
+bundle exec rspec        # model specs + request specs for all four endpoints
 ```
 
 ## Schema & key decisions
@@ -70,4 +119,4 @@ Provider ──< Enrollment >── Client ──< JournalEntry
   multi-tenancy, so a provider only sees their own clients' data) with Pundit policies and
   deny-by-default. Especially important here since journal entries are PHI.
 - Pagination of journal feeds (keyset/cursor) for large datasets.
-- Exposing this via controllers / GraphQL.
+- GraphQL layer (the REST API is the pairing starting point).
