@@ -1,9 +1,13 @@
+# frozen_string_literal: true
+
 class ClientsController < ApplicationController
   before_action :set_client, only: %i[show providers]
 
-  # GET /clients
+  # GET /clients?limit=50&offset=0
   def index
-    render json: Client.order(:id)
+    limit  = params.fetch(:limit,  50).to_i.clamp(1, 100)
+    offset = [params.fetch(:offset, 0).to_i, 0].max
+    render json: Client.order(:created_at).limit(limit).offset(offset)
   end
 
   # GET /clients/:id

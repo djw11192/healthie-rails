@@ -24,10 +24,27 @@ RSpec.describe Client, type: :model do
   describe "#journal_entries (query 3: a client's entries by date)" do
     it "returns the client's entries, newest first" do
       client = create(:client)
-      older = create(:journal_entry, client: client, created_at: 2.days.ago)
-      newer = create(:journal_entry, client: client, created_at: 1.hour.ago)
+      older = create(:journal_entry, client: client, recorded_at: 2.days.ago)
+      newer = create(:journal_entry, client: client, recorded_at: 1.hour.ago)
 
       expect(client.journal_entries.by_recent.to_a).to eq([newer, older])
+    end
+  end
+
+  describe "PHI retention" do
+    it "cannot be destroyed while journal entries exist" do
+      client = create(:client)
+      create(:journal_entry, client: client)
+
+      expect { client.destroy }.not_to change { Client.count }
+      expect(client.errors[:base]).to be_present
+    end
+
+    it "can be destroyed once all journal entries are removed" do
+      client = create(:client)
+      create(:journal_entry, client: client).destroy
+
+      expect { client.destroy }.to change { Client.count }.by(-1)
     end
   end
 end

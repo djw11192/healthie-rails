@@ -37,7 +37,7 @@ entries = [
 ]
 
 entries.each do |client, days_ago, body|
-  client.journal_entries.create!(body: body, created_at: days_ago.days.ago)
+  client.journal_entries.create!(body: body, recorded_at: days_ago.days.ago)
 end
 
 puts "Done. #{Provider.count} providers, #{Client.count} clients, " \

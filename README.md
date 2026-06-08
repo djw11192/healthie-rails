@@ -49,7 +49,7 @@ This prints, against seeded data:
    JournalEntry
      .joins(client: :enrollments)
      .where(enrollments: { provider_id: provider.id })
-     .order(created_at: :desc)
+     .order(recorded_at: :desc)
    ```
 
 ## API endpoints (try them in Postman / curl)
@@ -73,17 +73,17 @@ bin/rails server     # http://localhost:3000
 Notes:
 - All responses are JSON; an unknown `:id` returns a JSON `404`.
 - `plan` (basic/premium) is included where relevant because it lives on the provider↔client join.
-- IDs aren't guaranteed to start at 1 (Postgres sequences persist across re-seeds) — use the
-  `GET /providers` and `GET /clients` index routes to find real IDs.
+- IDs are UUIDs (e.g. `"a1b2c3d4-..."`); use the `GET /providers` and `GET /clients` index
+  routes to discover real IDs.
 
 Example:
 
 ```bash
 curl http://localhost:3000/providers
-curl http://localhost:3000/providers/1/journal_entries
+curl http://localhost:3000/providers/{uuid}/journal_entries
 
 # Post a new journal entry for a client:
-curl -X POST http://localhost:3000/clients/1/journal_entries \
+curl -X POST http://localhost:3000/clients/{uuid}/journal_entries \
   -H 'Content-Type: application/json' \
   -d '{"journal_entry": {"body": "Felt great today."}}'
 ```
@@ -109,14 +109,19 @@ Provider ──< Enrollment >── Client ──< JournalEntry
   Rails enum.
 - **Uniqueness** of `(provider_id, client_id)` is enforced both by a DB unique index and a model
   validation (DB index = correctness under concurrency; model validation = friendly errors).
-- **Indexes**: unique `[provider_id, client_id]` on enrollments; `[client_id, created_at]` on
+- **`recorded_at`** on `journal_entries` — the user-controlled event timestamp (supports
+  backdating). `created_at` remains the system insert time. All journal feeds sort by `recorded_at`.
+- **Indexes**: unique `[provider_id, client_id]` on enrollments; `[client_id, recorded_at]` on
   journal entries (serves both the per-client feed and the cross-provider feed without a separate
-  sort).
+  sort). Primary keys use UUID (`gen_random_uuid()`).
+- **UUID primary keys** on all tables — opaque, no sequential information leaked in IDs.
 
-## Intentionally out of scope (let's pair on these)
+## Intentionally out of scope
 
 - **AuthN/AuthZ** — in production I'd scope every query through `enrollments` (row-level
   multi-tenancy, so a provider only sees their own clients' data) with Pundit policies and
   deny-by-default. Especially important here since journal entries are PHI.
-- Pagination of journal feeds (keyset/cursor) for large datasets.
-- GraphQL layer (the REST API is the pairing starting point).
+- **Cursor/keyset pagination** — index and list routes accept a `limit` param (1–100, default
+  varies by endpoint), but use limit/offset rather than a cursor. Offset pagination degrades at
+  scale on time-series feeds; a cursor on `(recorded_at, id)` is the right long-term solution.
+- Cache strategies (Redis)

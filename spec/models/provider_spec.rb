@@ -29,8 +29,8 @@ RSpec.describe Provider, type: :model do
       create(:enrollment, provider: provider, client: mine)
       create(:enrollment, provider: create(:provider), client: theirs)
 
-      ours = create(:journal_entry, client: mine, created_at: 1.day.ago)
-      newer = create(:journal_entry, client: mine, created_at: 1.hour.ago)
+      ours  = create(:journal_entry, client: mine, recorded_at: 1.day.ago)
+      newer = create(:journal_entry, client: mine, recorded_at: 1.hour.ago)
       create(:journal_entry, client: theirs)
 
       result = provider.journal_entries.by_recent

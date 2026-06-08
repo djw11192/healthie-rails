@@ -37,14 +37,22 @@ RSpec.describe "Query endpoints", type: :request do
   end
 
   describe "GET /clients/:id/journal_entries (query 3)" do
-    it "returns the client's entries, newest first" do
-      old = create(:journal_entry, client: alice, body: "older", created_at: 2.days.ago)
-      recent = create(:journal_entry, client: alice, body: "newer", created_at: 1.hour.ago)
+    it "returns the client's entries, newest first by recorded_at" do
+      old    = create(:journal_entry, client: alice, body: "older", recorded_at: 2.days.ago)
+      recent = create(:journal_entry, client: alice, body: "newer", recorded_at: 1.hour.ago)
 
       get "/clients/#{alice.id}/journal_entries"
 
       expect(response).to have_http_status(:ok)
       expect(json.map { |e| e["id"] }).to eq([recent.id, old.id])
+    end
+
+    it "respects a limit param" do
+      create_list(:journal_entry, 5, client: alice)
+
+      get "/clients/#{alice.id}/journal_entries", params: { limit: 3 }
+
+      expect(json.size).to eq(3)
     end
   end
 
@@ -60,6 +68,15 @@ RSpec.describe "Query endpoints", type: :request do
       expect(json["client_id"]).to eq(alice.id)
     end
 
+    it "accepts a backdated recorded_at" do
+      past = 3.days.ago.iso8601
+      post "/clients/#{alice.id}/journal_entries",
+           params: { journal_entry: { body: "Forgot to log this.", recorded_at: past } }
+
+      expect(response).to have_http_status(:created)
+      expect(Time.parse(json["recorded_at"])).to be_within(1.second).of(Time.parse(past))
+    end
+
     it "rejects a blank body with a 422 and error messages" do
       post "/clients/#{alice.id}/journal_entries",
            params: { journal_entry: { body: "" } }
@@ -71,9 +88,9 @@ RSpec.describe "Query endpoints", type: :request do
 
   describe "GET /providers/:id/journal_entries (query 4)" do
     it "spans all the provider's clients, newest first, tagged with the client" do
-      a = create(:journal_entry, client: alice, created_at: 1.day.ago)
-      b = create(:journal_entry, client: bob, created_at: 1.hour.ago)
-      create(:journal_entry, client: create(:client), created_at: 1.minute.ago) # other provider
+      a = create(:journal_entry, client: alice, recorded_at: 1.day.ago)
+      b = create(:journal_entry, client: bob,   recorded_at: 1.hour.ago)
+      create(:journal_entry, client: create(:client), recorded_at: 1.minute.ago) # other provider
 
       get "/providers/#{provider.id}/journal_entries"
 
@@ -85,7 +102,7 @@ RSpec.describe "Query endpoints", type: :request do
 
   describe "unknown id" do
     it "returns a JSON 404" do
-      get "/providers/0/clients"
+      get "/providers/#{SecureRandom.uuid}/clients"
 
       expect(response).to have_http_status(:not_found)
       expect(json).to have_key("error")

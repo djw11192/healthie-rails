@@ -1,9 +1,13 @@
+# frozen_string_literal: true
+
 class ProvidersController < ApplicationController
   before_action :set_provider, only: %i[show clients journal_entries]
 
-  # GET /providers
+  # GET /providers?limit=50&offset=0
   def index
-    render json: Provider.order(:id)
+    limit  = params.fetch(:limit,  50).to_i.clamp(1, 100)
+    offset = [params.fetch(:offset, 0).to_i, 0].max
+    render json: Provider.order(:created_at).limit(limit).offset(offset)
   end
 
   # GET /providers/:id
@@ -22,9 +26,10 @@ class ProvidersController < ApplicationController
 
   # GET /providers/:id/journal_entries  (query 4: across all of a provider's clients, by date)
   def journal_entries
-    entries = @provider.journal_entries.by_recent.includes(:client)
+    limit   = params.fetch(:limit, 25).to_i.clamp(1, 100)
+    entries = @provider.journal_entries.by_recent.limit(limit).includes(:client)
     render json: entries.as_json(
-      only: %i[id body created_at],
+      only: %i[id body recorded_at],
       include: { client: { only: %i[id name] } }
     )
   end
