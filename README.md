@@ -125,3 +125,4 @@ Provider ──< Enrollment >── Client ──< JournalEntry
   varies by endpoint), but use limit/offset rather than a cursor. Offset pagination degrades at
   scale on time-series feeds; a cursor on `(recorded_at, id)` is the right long-term solution.
 - Cache strategies (Redis)
+- **Encrypted fields** — PHI columns (`name`, `email`, `body`) are stored as plaintext. Production would use Rails 7+ `encrypts` (non-deterministic for free text, deterministic for indexed/unique fields like `email`).
