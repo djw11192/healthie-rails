@@ -121,8 +121,9 @@ Provider ──< Enrollment >── Client ──< JournalEntry
 - **AuthN/AuthZ** — in production I'd scope every query through `enrollments` (row-level
   multi-tenancy, so a provider only sees their own clients' data) with Pundit policies and
   deny-by-default. Especially important here since journal entries are PHI.
-- **Cursor/keyset pagination** — index and list routes accept a `limit` param (1–100, default
+- **Pagination** — index and list routes accept a `limit` param (1–100, default
   varies by endpoint), but use limit/offset rather than a cursor. Offset pagination degrades at
-  scale on time-series feeds; a cursor on `(recorded_at, id)` is the right long-term solution.
-- Cache strategies (Redis)
+  scale on time-series feeds.
+- **Cache strategies** - for example Redis.
 - **Encrypted fields** — PHI columns (`name`, `email`, `body`) are stored as plaintext. Production would use Rails 7+ `encrypts` (non-deterministic for free text, deterministic for indexed/unique fields like `email`).
+- **Other HIPAA Compliant Features** - for example audit logs.
